@@ -1,0 +1,54 @@
+
+package edu.umg.programacion2.gastoscore
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import edu.umg.programacion2.gastos.modelo.Gasto
+import edu.umg.programacion2.gastos.servicio.ControlGastos
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+data class GastosUiState(
+    val transacciones: List<Gasto> = emptyList(),
+    val egresos: Double = 0.0
+)
+
+class GastosViewModel : ViewModel() {
+
+    private val control: ControlGastos = Dependencias.control
+
+    private val _estado = MutableStateFlow(GastosUiState())
+    val estado = _estado.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            actualizarEstado()
+        }
+    }
+
+    fun registrar(gasto: Gasto, alTerminar: (String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val error = control.registrar(gasto)
+
+                if (error == null) {
+                    actualizarEstado()
+                }
+
+                alTerminar(error)
+            } catch (e: Exception) {
+                alTerminar(
+                    e.message ?: "No se pudo registrar el gasto"
+                )
+            }
+        }
+    }
+
+    private suspend fun actualizarEstado() {
+        _estado.value = GastosUiState(
+            transacciones = control.listar(),
+            egresos = control.total()
+        )
+    }
+}
